@@ -171,7 +171,7 @@ dominate wall clock, the MoEs are cheap.
 Per-run JSONL: `parse_ok`, `tool_correct`, `args_correct`, `chain_complete`, `turns`,
 `overcall`, `hallucinated_arg`, token counts, `wall_clock_s`, `gen_tok_per_s`, `raw_response`.
 
-Aggregate `report.md`:
+Aggregate per-model report (`report_<label>.md`):
 
 1. **One table:** per-tier strict accuracy (parse ∧ tool ∧ args), overcall rate,
    hallucinated-arg rate, median gen tok/s, per model.
