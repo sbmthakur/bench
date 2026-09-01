@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 import mock_tools
 from exercises import EXERCISES, SYSTEM
 
-MAX_TURNS = 6
+MAX_TURNS = 10
 
 
 def vram_gib():
@@ -100,10 +100,14 @@ def run_one(url, ex, cache_prompt=True):
         calls_per_turn.append(this_turn)
 
     wall = time.time() - t0
+    # the loop exits either on a tool-call-free reply (final answer), on error, or by
+    # exhausting MAX_TURNS. the third case is a harness limit, not a model result.
+    cap_exhausted = (turns >= MAX_TURNS and not final_text and harness_error is None)
     # parse_ok: every emitted tool call had valid JSON arguments
     parse_ok = harness_error is None and all(
         "__unparsable__" not in c["args"] for c in calls)
-    return {"turns": turns, "calls": calls, "results": results,
+    return {"turns": turns, "cap_exhausted": cap_exhausted,
+            "calls": calls, "results": results,
             "calls_per_turn": calls_per_turn, "final_text": final_text,
             "parse_ok": parse_ok, "harness_error": harness_error,
             "prompt_tokens": prompt_tok, "gen_tokens": gen_tok,
@@ -163,12 +167,16 @@ def main():
                 m = {"scorer_error": f"{type(e).__name__}: {e}", "needs_review": True}
         else:
             m = {}
+        if r["cap_exhausted"]:
+            m["chain_complete"] = False
+            m["needs_review"] = True
         strict = bool(r["parse_ok"] and m.get("tool_correct") and m.get("args_correct"))
         v = vram_gib()
         peak = max(peak, v or 0)
         row = {"n": i, "exercise": ex["id"], "tier": ex["tier"], "rep": rep,
                "prompt": ex["prompt"], "strict_correct": strict,
-               **{k: r[k] for k in ("parse_ok", "harness_error", "turns", "prompt_tokens",
+               **{k: r[k] for k in ("parse_ok", "harness_error", "turns", "cap_exhausted",
+                                    "prompt_tokens",
                                     "gen_tokens", "reasoning_words", "wall_clock_s",
                                     "gen_tok_per_s")},
                **m,
@@ -185,6 +193,8 @@ def main():
             notes.append("hallucinated_arg")
         if m.get("used_today_date"):
             notes.append("used_today_date")
+        if r["cap_exhausted"]:
+            notes.append("CAP_EXHAUSTED")
         if m.get("needs_review"):
             notes.append("NEEDS_REVIEW")
         if m.get("issued_parallel"):
